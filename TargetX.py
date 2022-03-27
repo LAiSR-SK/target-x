@@ -114,6 +114,13 @@ def targetx(image, net, eps=0.05, num_classes=10, overshoot=0.02, max_iter=50):
         cur_grad = x.grad.data.cpu().numpy().copy()
         cur_sign_grad = x.grad.sign().cpu().numpy().copy()  # added for fgsm
 
+        k_i_index = np.where(I == I[0])
+        print("k_I_INDEX: ")
+        print(k_i_index)
+        print("K_I: ")
+        print(k_i)
+        k_i_index = k_i_index[0][0]
+
         # set new w_k, distance between original and current gradient, and new f_k, distance between original and target label
         w = grad_target - grad_orig
         f_k = (fs[0, I[k]] - fs[0, I[0]]).data.cpu().numpy()
@@ -247,6 +254,15 @@ def targetx_arg(image, net, target_label, eps=0.05, num_classes=10, overshoot=0.
         cur_grad = x.grad.data.cpu().numpy().copy()
         cur_sign_grad = x.grad.sign().cpu().numpy().copy()  # added for fgsm
 
+        zero_gradients(x)
+
+        k_i_index = np.where(I == I[0])
+        print("k_I_INDEX: ")
+        print(k_i_index)
+        print("K_I: ")
+        print(k_i)
+        k_i_index = k_i_index[0][0]
+
         # set new w_k, distance between original and current gradient, and new f_k, distance between original and target label
         w = grad_target - grad_orig
         f_k = (fs[0, I[k]] - fs[0, I[0]]).data.cpu().numpy()
@@ -284,7 +300,7 @@ def targetx_arg(image, net, target_label, eps=0.05, num_classes=10, overshoot=0.
 
     r_tot = (1 + overshoot) * r_tot
 
-    return r_tot, loop_i, orig_label, k_i, pert_image, pert, newf_k
+    return r_tot, loop_i, orig_label, k_i, pert_image, newf_k
 
 def targetx_return_I_array(image, net, num_classes=10):
     is_cuda = torch.cuda.is_available()
