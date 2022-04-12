@@ -104,22 +104,8 @@ def targetx(image, net, eps=0.05, num_classes=10, overshoot=0.02, max_iter=50):
         fs[0, I[k]].backward(retain_graph=True)
         grad_target = x.grad.data.cpu().numpy().copy()
         target_sign_grad = x.grad.sign().cpu().numpy().copy()
-
+        
         zero_gradients(x)
-
-        fs[0, I[k]].backward(retain_graph=True)
-        print(I[k])
-        print('0, I[k]')
-        print(fs[0, I[k]])
-        cur_grad = x.grad.data.cpu().numpy().copy()
-        cur_sign_grad = x.grad.sign().cpu().numpy().copy()  # added for fgsm
-
-        k_i_index = np.where(I == I[0])
-        print("k_I_INDEX: ")
-        print(k_i_index)
-        print("K_I: ")
-        print(k_i)
-        k_i_index = k_i_index[0][0]
 
         # set new w_k, distance between original and current gradient, and new f_k, distance between original and target label
         w = grad_target - grad_orig
@@ -211,6 +197,8 @@ def targetx_arg(image, net, target_label, eps=0.05, num_classes=10, overshoot=0.
     # create r_tot
     r_tot = np.zeros(input_shape)
 
+    newf_k = 0
+
     # initialize loop variable to 0
     loop_i = 0
 
@@ -246,22 +234,6 @@ def targetx_arg(image, net, target_label, eps=0.05, num_classes=10, overshoot=0.
         target_sign_grad = x.grad.sign().cpu().numpy().copy()
 
         zero_gradients(x)
-
-        fs[0, I[k]].backward(retain_graph=True)
-        print(I[k])
-        print('0, I[k]')
-        print(fs[0, I[k]])
-        cur_grad = x.grad.data.cpu().numpy().copy()
-        cur_sign_grad = x.grad.sign().cpu().numpy().copy()  # added for fgsm
-
-        zero_gradients(x)
-
-        k_i_index = np.where(I == I[0])
-        print("k_I_INDEX: ")
-        print(k_i_index)
-        print("K_I: ")
-        print(k_i)
-        k_i_index = k_i_index[0][0]
 
         # set new w_k, distance between original and current gradient, and new f_k, distance between original and target label
         w = grad_target - grad_orig
@@ -304,8 +276,6 @@ def targetx_arg(image, net, target_label, eps=0.05, num_classes=10, overshoot=0.
 
 def targetx_return_I_array(image, net, num_classes=10):
     is_cuda = torch.cuda.is_available()
-    ILSVRClabels = open(os.path.join('synset_words.txt'), 'r').read().split('\n')
-
     # If cuda is available use GPU for faster processing, if not, use CPU.
     if is_cuda:
         print("Using GPU")
