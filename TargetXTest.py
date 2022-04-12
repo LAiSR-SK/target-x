@@ -15,7 +15,11 @@ net = models.resnet34(pretrained=True)
 net.eval()
 
 #Open image
-im_orig = Image.open('new/ILSVRC2017_test_00004355.JPEG')
+# im_orig = Image.open('new/ILSVRC2017_test_00004355.JPEG')
+# im_orig = Image.open('pictures/buffalo.JPEG')
+# im_orig = Image.open('pictures/cat.JPEG')
+im_orig = Image.open('pictures/owl.JPEG')
+
 
 mean = [ 0.485, 0.456, 0.406 ]
 std = [ 0.229, 0.224, 0.225 ]
@@ -33,7 +37,7 @@ im = transforms.Compose([
 I = targetx_return_I_array(im, net, 10)
 print(I)
 start_time = time.time()
-r, loop_i, label_orig, label_pert, pert_image, pert, newf_k = targetx(im, net, 0.05)
+r, loop_i, label_orig, label_pert, pert_image, pert, newf_k = targetx(im, net, 0.001)
 # r, loop_i, label_orig, label_pert, pert_image, pert, newf_k = targetx_arg(im, net, 318, 0.001)
 end_time = time.time()
 exec_time  = end_time-start_time
@@ -66,17 +70,36 @@ tf = transforms.Compose([transforms.Normalize(mean=[0, 0, 0], std=list(map(lambd
                         transforms.ToPILImage(),
                         transforms.CenterCrop(224)])
 
+# plt.figure()
+# plt.imshow(tf(im.cpu()))
+# plt.title(str_label_orig)
+# plt.show()
+#
+# plt.figure()
+# plt.imshow(tf(pert_image.cpu()[0]))
+# plt.title(str_label_pert)
+# plt.show()
+#
+# plt.figure()
+# plt.imshow(tf(pert.cpu()[0]))
+# plt.title(str_label_pert)
+# plt.show()
+
 plt.figure()
 plt.imshow(tf(im.cpu()))
 plt.title(str_label_orig)
+tf(im.cpu()).save('orig.png')
 plt.show()
-
 plt.figure()
 plt.imshow(tf(pert_image.cpu()[0]))
+img = tf(pert_image.cpu()[0])
+img.save('image.png')
 plt.title(str_label_pert)
 plt.show()
-
+print(loop_i)
 plt.figure()
-plt.imshow(tf(pert.cpu()[0]))
+fc = 100000
+plt.imshow(tf(pert.cpu()[0]*fc))
+tf(pert.cpu()[0]*fc).save('perturbation.png')
 plt.title(str_label_pert)
 plt.show()
