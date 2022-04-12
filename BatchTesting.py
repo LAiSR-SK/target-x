@@ -2,19 +2,16 @@
 import torchvision.transforms as transforms
 import numpy as np
 import torch
-import torch.nn as nn
 from torch.autograd import Variable
 import torchvision.models as models
 from PIL import Image
 import random
 from TargetX import targetx_arg, targetx_return_I_array
 import os
-from imagenet_labels import classes
 import time
 import glob
 import csv
 import art
-import cv2
 
 # these are the needed networks that are to be used
 res34 = models.resnet34(pretrained=True)
