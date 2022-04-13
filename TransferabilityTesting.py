@@ -428,7 +428,7 @@ def TransferTesting_TargetFGSM(net, net2, eps, csvname):
         if (int(label_pert) == int(inputNum)):
             print("Image perturbed to a target")
             TargetSuccess = TargetSuccess + 1
-        if (int(label_pert) != int(correct) and int(label_pert) not in I):
+        if (int(label_pert) != int(correct) and int(label_pert) != int(inputNum)):
             print("Image perturbed but not to target")
             Incorrect_pert_Success = Incorrect_pert_Success + 1
 
