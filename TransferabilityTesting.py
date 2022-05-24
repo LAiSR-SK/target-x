@@ -40,18 +40,19 @@ d201 = models.densenet201(pretrained=True)
 
 
 # Define transfer testing function, input network to perturb image with, network to test image, epsilon, and csv name.
-def TransferTesting_targetx(net, net2, eps, csvname):
-    net.cuda()
-    net2.cuda()
-    net.eval()
-    net2.eval()
+def TransferTesting_targetx(source_net, target_net, eps, csvname):
+    source_net.cuda()
+    target_net.cuda()
+    source_net.eval()
+    target_net.eval()
     Accuracy = 0
     PerturbedAccuracy = 0
-    net2_Accuracy = 0
-    net2_PerturbedAccuracy = 0
-    TransferableSuccess = 0
-    TargetSuccess = 0
+    targetNet_Accuracy = 0
+    targetNet_PerturbedAccuracy = 0
+    Target_classification_Success = 0
     Incorrect_pert_Success = 0
+    untargeted_transferability = 0
+    targeted_transferability = 0
     Net2Correct = 0
     targetx_csv = csvname
     fieldnames = ['Image', 'Correct Label', 'Network 1 Orig Label', 'Network 2 Orig Label', 'Network 1 Pert Label',
@@ -85,7 +86,7 @@ def TransferTesting_targetx(net, net2, eps, csvname):
                                  std=std)])(im_orig)
 
         # returns the 10 nearest labels for the image
-        I = targetx_return_I_array(im, net, 10)
+        I = targetx_return_I_array(im, source_net, 10)
         print(I)
 
         # label to exclude from choice
@@ -100,7 +101,7 @@ def TransferTesting_targetx(net, net2, eps, csvname):
 
         correct = ILSVRClabels[np.int(counter)].split(' ')[1]
         x = Variable(im.cuda()[None, :], requires_grad=True)
-        detect = net.forward(x)
+        detect = source_net.forward(x)
         detected = np.argmax(detect.data.cpu().numpy().flatten())
         str_label_detect = labels[np.int(detected)].split(',')[0]
         print('Detected: ', str_label_detect)
@@ -119,7 +120,7 @@ def TransferTesting_targetx(net, net2, eps, csvname):
         print('Correct: ', str_label_correct)
 
         start_time = time.time()
-        r, loop_i, label_orig, label_pert, pert_image, newf_k = targetx_arg(im, net, inputNum, eps)
+        r, loop_i, label_orig, label_pert, pert_image, newf_k = targetx_arg(im, source_net, inputNum, eps)
         end_time = time.time()
 
         execution_time = end_time - start_time
@@ -139,27 +140,31 @@ def TransferTesting_targetx(net, net2, eps, csvname):
             PerturbedAccuracy = PerturbedAccuracy + 1
         if (int(label_pert) == inputNum):
             print("Image perturbed to target")
-            TargetSuccess = TargetSuccess + 1
+            Target_classification_Success = Target_classification_Success + 1
         if (int(label_pert) != int(correct) and int(label_pert) != inputNum):
             print("Image perturbed but not to target")
             Incorrect_pert_Success = Incorrect_pert_Success + 1
 
-        label2 = net2(im[None, :].cuda())
+        label2 = target_net(im[None, :].cuda())
         label2 = np.argmax(label2.detach().cpu().numpy())
         str_label_orig2 = labels[np.int(label2)].split(',')[0]
-        label_pert2 = net2(pert_image)
+        label_pert2 = target_net(pert_image)
         label_pert2 = np.argmax(label_pert2.detach().cpu().numpy())
         str_label_pert2 = labels[np.int(label_pert2)].split(',')[0]
 
         if (int(label2) == int(correct)):
             print("Net 2 Classifier is correct")
-            net2_Accuracy = net2_Accuracy + 1
+            targetNet_Accuracy = targetNet_Accuracy + 1
         if (int(label_pert2) == int(correct)):
             print("Net 2 Classifier is correct on perturbed image")
-            net2_PerturbedAccuracy = net2_PerturbedAccuracy + 1
-        if (int(label_pert2) == int(label_pert)):
-            print("Attack was Transferable")
-            TransferableSuccess = TransferableSuccess + 1
+            targetNet_PerturbedAccuracy = targetNet_PerturbedAccuracy + 1
+        if (int(label_pert2) != int(correct)):
+            print("Attack was transferable in untargeted setting")
+            untargeted_transferability = untargeted_transferability + 1
+        if(int(label_pert) == inputNum):
+            if(int(label_pert2) == inputNum):
+                print("Attack was transferable in targeted settng")
+                targeted_transferability = targeted_transferability + 1
         if (int(label_pert2) == int(label2)):
             print("Network 2 Perturbed Label = Network 2 Original Label")
             Net2Correct = Net2Correct + 1
@@ -178,13 +183,13 @@ def TransferTesting_targetx(net, net2, eps, csvname):
         csvwriter.writerows(["Epsilon: " + str(eps)])
         csvwriter.writerows(["Accuracy: " + str(Accuracy / 5000)])
         csvwriter.writerows(["Perturbed Accuracy: " + str(PerturbedAccuracy / 5000)])
-        csvwriter.writerows(["Transfered Accuracy: " + str(net2_Accuracy / 5000)])
-        csvwriter.writerows(["Transferred Perturbed Accuracy: " + str(net2_PerturbedAccuracy / 5000)])
-        csvwriter.writerows(["Perturbed To Target Success: " + str(TargetSuccess / 5000)])
+        csvwriter.writerows(["Transfered Accuracy: " + str(targetNet_Accuracy / 5000)])
+        csvwriter.writerows(["Transferred Perturbed Accuracy: " + str(targetNet_PerturbedAccuracy / 5000)])
+        csvwriter.writerows(["Perturbed To Target Success: " + str(Target_classification_Success / 5000)])
         csvwriter.writerows(["Perturbed But Not To Target: " + str(Incorrect_pert_Success / 5000)])
-        csvwriter.writerows(["Transferability Success: " + str(TransferableSuccess / 5000)])
+        csvwriter.writerows(["Untargeted Transferability Success: " + str(untargeted_transferability / 5000)])
+        csvwriter.writerows(["Targeted Transferability Success: " + str(targeted_transferability / 5000)])
         csvwriter.writerows(["Net2 Correctness: " + str(Net2Correct / 5000)])
-
 
 # Define transfer testing function, input network to perturb image with, network to test image, epsilon, and csv name.
 def CIFAR_targetx_TransferTesting(original_net, transfer_net, eps, csvname):
@@ -222,7 +227,7 @@ def CIFAR_targetx_TransferTesting(original_net, transfer_net, eps, csvname):
     counter = 0
     for i, data in enumerate(testset):  # assuming jpg
         inputs, labels = data
-        if counter == 5000:
+        if counter == 1000:
             break
         print(" \n\n\n**************** TargetX Approach *********************\n")
 
@@ -303,28 +308,28 @@ def CIFAR_targetx_TransferTesting(original_net, transfer_net, eps, csvname):
     with open(csvname, 'a', newline='') as csvfile:
         csvwriter = csv.writer(csvfile)
         csvwriter.writerows(["Epsilon: " + str(eps)])
-        csvwriter.writerows(["Accuracy: " + str(Accuracy / 5000)])
-        csvwriter.writerows(["Perturbed Accuracy: " + str(PerturbedAccuracy / 5000)])
-        csvwriter.writerows(["Transfered Accuracy: " + str(net2_Accuracy / 5000)])
-        csvwriter.writerows(["Transferred Perturbed Accuracy: " + str(net2_PerturbedAccuracy / 5000)])
-        csvwriter.writerows(["Perturbed Target Success: " + str(TargetSuccess / 5000)])
-        csvwriter.writerows(["Perturbed But Not To Target: " + str(Incorrect_pert_Success / 5000)])
-        csvwriter.writerows(["Transferability Success: " + str(TransferableSuccess / 5000)])
-        csvwriter.writerows(["Net2 Correctness: " + str(Net2Correct / 5000)])
+        csvwriter.writerows(["Accuracy: " + str(Accuracy / 1000)])
+        csvwriter.writerows(["Perturbed Accuracy: " + str(PerturbedAccuracy / 1000)])
+        csvwriter.writerows(["Transfered Accuracy: " + str(net2_Accuracy / 1000)])
+        csvwriter.writerows(["Transferred Perturbed Accuracy: " + str(net2_PerturbedAccuracy / 1000)])
+        csvwriter.writerows(["Perturbed Target Success: " + str(TargetSuccess / 1000)])
+        csvwriter.writerows(["Perturbed But Not To Target: " + str(Incorrect_pert_Success / 1000)])
+        csvwriter.writerows(["Transferability Success: " + str(TransferableSuccess / 1000)])
+        csvwriter.writerows(["Net2 Correctness: " + str(Net2Correct / 1000)])
 
-
-def TransferTesting_TargetFGSM(net, net2, eps, csvname):
-    net.cuda()
-    net2.cuda()
-    net.eval()
-    net2.eval()
+def TransferTesting_TargetFGSM(source_net, target_net, eps, csvname):
+    source_net.cuda()
+    target_net.cuda()
+    source_net.eval()
+    target_net.eval()
     Accuracy = 0
     PerturbedAccuracy = 0
-    net2_Accuracy = 0
-    net2_PerturbedAccuracy = 0
-    TransferableSuccess = 0
-    TargetSuccess = 0
+    targetNet_Accuracy = 0
+    targetNet_PerturbedAccuracy = 0
+    Target_classification_Success = 0
     Incorrect_pert_Success = 0
+    untargeted_transferability = 0
+    targeted_transferability = 0
     Net2Correct = 0
     fgsmcsv = csvname
 
@@ -344,10 +349,10 @@ def TransferTesting_TargetFGSM(net, net2, eps, csvname):
     labels = open(os.path.join('synset_words.txt'), 'r').read().split('\n')
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(net.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(source_net.parameters(), lr=0.01)
 
     classifier = art.estimators.classification.PyTorchClassifier(
-        model=net,
+        model=source_net,
         input_shape=(3, 224, 224),
         loss=criterion,
         optimizer=optimizer,
@@ -367,7 +372,7 @@ def TransferTesting_TargetFGSM(net, net2, eps, csvname):
             transforms.Normalize(mean=mean,
                                  std=std)])(im_orig)
 
-        I = targetx_return_I_array(im, net, 10)
+        I = targetx_return_I_array(im, source_net, 10)
         print(I)
 
         # label to exclude from choice
@@ -382,7 +387,7 @@ def TransferTesting_TargetFGSM(net, net2, eps, csvname):
 
         correct = ILSVRClabels[np.int(counter)].split(' ')[1]
         x = Variable(im.cuda()[None, :], requires_grad=True)
-        detect = net.forward(x)
+        detect = source_net.forward(x)
         detected = np.argmax(detect.data.cpu().numpy().flatten())
         str_label_detect = labels[np.int(detected)].split(',')[0]
         print('Detected: ', str_label_detect)
@@ -426,28 +431,32 @@ def TransferTesting_TargetFGSM(net, net2, eps, csvname):
             print("Classifier is correct on perturbed image")
             PerturbedAccuracy = PerturbedAccuracy + 1
         if (int(label_pert) == int(inputNum)):
-            print("Image perturbed to a target")
-            TargetSuccess = TargetSuccess + 1
+            print("Image perturbed to target label")
+            Target_classification_Success = Target_classification_Success + 1
         if (int(label_pert) != int(correct) and int(label_pert) != int(inputNum)):
             print("Image perturbed but not to target")
             Incorrect_pert_Success = Incorrect_pert_Success + 1
 
-        label2 = net2(im[None, :].cuda())
+        label2 = target_net(im[None, :].cuda())
         label2 = np.argmax(label2.detach().cpu().numpy())
         str_label_orig2 = labels[np.int(label2)].split(',')[0]
-        label_pert2 = net2(pert_img[None, :].cuda())
+        label_pert2 = target_net(pert_img[None, :].cuda())
         label_pert2 = np.argmax(label_pert2.detach().cpu().numpy())
         str_label_pert2 = labels[np.int(label_pert2)].split(',')[0]
 
         if (int(label2) == int(correct)):
             print("Net 2 Classifier is correct")
-            net2_Accuracy = net2_Accuracy + 1
+            targetNet_Accuracy = targetNet_Accuracy + 1
         if (int(label_pert2) == int(correct)):
             print("Net 2 Classifier is correct on perturbed image")
-            net2_PerturbedAccuracy = net2_PerturbedAccuracy + 1
-        if (int(label_pert2) == int(label_pert)):
-            print("Attack was Transferable")
-            TransferableSuccess = TransferableSuccess + 1
+            targetNet_PerturbedAccuracy = targetNet_PerturbedAccuracy + 1
+        if (int(label_pert2) != int(correct)):
+            print("Attack was transferable in untargeted setting")
+            untargeted_transferability = untargeted_transferability + 1
+        if(int(label_pert) == inputNum):
+            if(int(label_pert2) == inputNum):
+                print("Attack was transferable in targeted settng")
+                targeted_transferability = targeted_transferability + 1
         if (int(label_pert2) == int(label2)):
             print("Network 2 Perturbed Label = Network 2 Original Label")
             Net2Correct = Net2Correct + 1
@@ -466,9 +475,176 @@ def TransferTesting_TargetFGSM(net, net2, eps, csvname):
         csvwriter.writerows(["Epsilon: " + str(eps)])
         csvwriter.writerows(["Original Accuracy: " + str(Accuracy / 5000)])
         csvwriter.writerows(["Original Perturbed Accuracy: " + str(PerturbedAccuracy / 5000)])
-        csvwriter.writerows(["Transfered Accuracy: " + str(net2_Accuracy / 5000)])
-        csvwriter.writerows(["Transfered Perturbed Accuracy: " + str(net2_PerturbedAccuracy / 5000)])
-        csvwriter.writerows(["Perturbed To Target Success: " + str(TargetSuccess / 5000)])
+        csvwriter.writerows(["Transfered Accuracy: " + str(targetNet_Accuracy / 5000)])
+        csvwriter.writerows(["Transfered Perturbed Accuracy: " + str(targetNet_PerturbedAccuracy / 5000)])
+        csvwriter.writerows(["Perturbed To Target Success: " + str(Target_classification_Success / 5000)])
         csvwriter.writerows(["Perturbed But Not To Target: " + str(Incorrect_pert_Success / 5000)])
-        csvwriter.writerows(["Transferability Success: " + str(TransferableSuccess / 5000)])
+        csvwriter.writerows(["Untargeted Transferability Success: " + str(untargeted_transferability / 5000)])
+        csvwriter.writerows(["Targeted Transferability Success: " + str(targeted_transferability / 5000)])
+        csvwriter.writerows(["Net2 Correctness: " + str(Net2Correct / 5000)])
+
+def TransferTesting_TargetUAP(source_net, target_net, eps, csvname):
+    source_net.cuda()
+    target_net.cuda()
+    source_net.eval()
+    target_net.eval()
+    Accuracy = 0
+    PerturbedAccuracy = 0
+    targetNet_Accuracy = 0
+    targetNet_PerturbedAccuracy = 0
+    Target_classification_Success = 0
+    Incorrect_pert_Success = 0
+    untargeted_transferability = 0
+    targeted_transferability = 0
+    Net2Correct = 0
+    tuapcsv = csvname
+
+    fieldnames = ['Image', 'Correct Label', 'Network 1 Orig Label', 'Network 2 Orig Label', 'Network 1 Pert Label',
+                  'Network 2 Pert Label']
+
+    counter = 0
+
+    with open(tuapcsv, 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow(fieldnames)
+
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+
+    ILSVRClabels = open(os.path.join('ILSVRC2012validation.txt'), 'r').read().split('\n')
+    labels = open(os.path.join('synset_words.txt'), 'r').read().split('\n')
+
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(source_net.parameters(), lr=0.01)
+
+    classifier = art.estimators.classification.PyTorchClassifier(
+        model=source_net,
+        input_shape=(3, 224, 224),
+        loss=criterion,
+        optimizer=optimizer,
+        nb_classes=1000
+    )
+
+    for filename in glob.glob('D:/imageNet/ImagenetDataset/ILSVRC2012/ILSVRC/Data/CLS-LOC/val/*.JPEG'):  # assuming jpg
+        if counter == 5000:
+            break
+        print('T-FGSM Testing')
+        im_orig = Image.open(filename).convert('RGB')
+        print(filename)
+        im = transforms.Compose([
+            transforms.Scale(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean,
+                                 std=std)])(im_orig)
+
+        I = targetx_return_I_array(im, source_net, 10)
+        print(I)
+
+        # label to exclude from choice
+        exclude_label = I[0]
+        # chooses a random int in the I array
+        inputNum = random.choice(I)
+        if inputNum == exclude_label:
+            print("target label same as original label")
+            inputNum = random.choice(I)
+        targetLabel = np.array([])
+        targetLabel = np.append(targetLabel, inputNum)
+
+        correct = ILSVRClabels[np.int(counter)].split(' ')[1]
+        x = Variable(im.cuda()[None, :], requires_grad=True)
+        detect = source_net.forward(x)
+        detected = np.argmax(detect.data.cpu().numpy().flatten())
+        str_label_detect = labels[np.int(detected)].split(',')[0]
+        print('Detected: ', str_label_detect)
+
+        start_time = time.time()
+
+        input_batch = im.unsqueeze(0)
+        result = classifier.predict(input_batch, 1, False)
+        label_orig = np.argmax(result.flatten())
+
+        labels = open(os.path.join('synset_words.txt'), 'r').read().split('\n')
+
+        attack = art.attacks.evasion.TargetedUniversalPerturbation(classifier=classifier, attacker='fgsm', eps=eps)
+        input_array = input_batch.numpy()
+        img_adv = attack.generate(x=input_array, y=targetLabel)
+
+        print("Memory Usage: ", torch.cuda.memory_stats('cuda:0')['active.all.current'])
+
+        result_adv = classifier.predict(img_adv, 1, False)
+        label_pert = np.argmax(result_adv.flatten())
+
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print("execution time = " + str(execution_time))
+
+        pert_img = img_adv.squeeze()
+        pert_img = torch.from_numpy(pert_img)
+
+        str_label_correct = labels[np.int(correct)].split(',')[0]
+        str_label_orig = labels[np.int(label_orig)].split(',')[0]
+        str_label_pert = labels[np.int(label_pert)].split(',')[0]
+
+        print("Correct label = ", str_label_correct)
+        print("Original label = ", str_label_orig)
+        print("Perturbed label = ", str_label_pert)
+
+        if (int(label_orig) == int(correct)):
+            print("Classifier is correct")
+            Accuracy = Accuracy + 1
+        if (int(label_pert) == int(correct)):
+            print("Classifier is correct on perturbed image")
+            PerturbedAccuracy = PerturbedAccuracy + 1
+        if (int(label_pert) == int(inputNum)):
+            print("Image perturbed to target label")
+            Target_classification_Success = Target_classification_Success + 1
+        if (int(label_pert) != int(correct) and int(label_pert) != int(inputNum)):
+            print("Image perturbed but not to target")
+            Incorrect_pert_Success = Incorrect_pert_Success + 1
+
+        label2 = target_net(im[None, :].cuda())
+        label2 = np.argmax(label2.detach().cpu().numpy())
+        str_label_orig2 = labels[np.int(label2)].split(',')[0]
+        label_pert2 = target_net(pert_img[None, :].cuda())
+        label_pert2 = np.argmax(label_pert2.detach().cpu().numpy())
+        str_label_pert2 = labels[np.int(label_pert2)].split(',')[0]
+
+        if (int(label2) == int(correct)):
+            print("Net 2 Classifier is correct")
+            targetNet_Accuracy = targetNet_Accuracy + 1
+        if (int(label_pert2) == int(correct)):
+            print("Net 2 Classifier is correct on perturbed image")
+            targetNet_PerturbedAccuracy = targetNet_PerturbedAccuracy + 1
+        if (int(label_pert2) != int(correct)):
+            print("Attack was transferable in untargeted setting")
+            untargeted_transferability = untargeted_transferability + 1
+        if (int(label_pert) == inputNum):
+            if (int(label_pert2) == inputNum):
+                print("Attack was transferable in targeted settng")
+                targeted_transferability = targeted_transferability + 1
+        if (int(label_pert2) == int(label2)):
+            print("Network 2 Perturbed Label = Network 2 Original Label")
+            Net2Correct = Net2Correct + 1
+
+        tuaprows = []
+        tuaprows.append(
+            [filename[47:75], str_label_correct, str_label_orig, str_label_orig2, str_label_pert, str_label_pert2])
+
+        with open(csvname, 'a', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerows(tuaprows)
+        counter = counter + 1
+
+    with open(csvname, 'a', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerows(["Epsilon: " + str(eps)])
+        csvwriter.writerows(["Original Accuracy: " + str(Accuracy / 5000)])
+        csvwriter.writerows(["Original Perturbed Accuracy: " + str(PerturbedAccuracy / 5000)])
+        csvwriter.writerows(["Transfered Accuracy: " + str(targetNet_Accuracy / 5000)])
+        csvwriter.writerows(["Transfered Perturbed Accuracy: " + str(targetNet_PerturbedAccuracy / 5000)])
+        csvwriter.writerows(["Perturbed To Target Success: " + str(Target_classification_Success / 5000)])
+        csvwriter.writerows(["Perturbed But Not To Target: " + str(Incorrect_pert_Success / 5000)])
+        csvwriter.writerows(["Untargeted Transferability Success: " + str(untargeted_transferability / 5000)])
+        csvwriter.writerows(["Targeted Transferability Success: " + str(targeted_transferability / 5000)])
         csvwriter.writerows(["Net2 Correctness: " + str(Net2Correct / 5000)])
