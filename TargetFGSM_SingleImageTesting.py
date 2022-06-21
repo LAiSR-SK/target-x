@@ -11,6 +11,8 @@ import os
 from TargetX import targetx_return_I_array
 
 # im_orig = Image.open('pictures/buffalo.JPEG')
+# im_orig = Image.open('new/ILSVRC2017_test_00004355.JPEG')
+# im_orig = Image.open('new/ILSVRC2017_test_00004376.JPEG')
 im_orig = Image.open('pictures/cat.JPEG')
 # im_orig = Image.open('pictures/crocodile.JPEG')
 # im_orig = Image.open('pictures/dog.JPEG')
@@ -99,7 +101,7 @@ print("Original Label: ", str_label_orig)
 # targetFGSM = art.attacks.evasion.FastGradientMethod(estimator=classifier, eps=0.0001, norm=np.inf, targeted=True)
 # targetFGSM = art.attacks.evasion.FastGradientMethod(estimator=classifier, eps=0.0005, norm=np.inf, targeted=True)
 # targetFGSM = art.attacks.evasion.FastGradientMethod(estimator=classifier, eps=0.001, norm=np.inf, targeted=True)
-targetFGSM = art.attacks.evasion.FastGradientMethod(estimator=classifier, eps=0.005, norm=np.inf, targeted=True)
+# targetFGSM = art.attacks.evasion.FastGradientMethod(estimator=classifier, eps=0.005, norm=np.inf, targeted=True)
 # targetFGSM = art.attacks.evasion.FastGradientMethod(estimator=classifier, eps=0.01, norm=np.inf, targeted=True)
 # targetFGSM = art.attacks.evasion.FastGradientMethod(estimator=classifier, eps=0.05, norm=np.inf, targeted=True)
 # targetFGSM = art.attacks.evasion.FastGradientMethod(estimator=classifier, eps=0.1, norm=np.inf, targeted=True)
@@ -145,7 +147,7 @@ plt.imshow(tf(torch.from_numpy(pert_im)))
 plt.title(str_label_pert)
 plt.show()
 
-targetFGSM_pert = torch.from_numpy(pert_im) - input_tensor
+targetFGSM_pert = (torch.from_numpy(pert_im) - input_tensor)
 plt.imshow(tf_mod(targetFGSM_pert))
 plt.title(str_label_pert)
 plt.show()
