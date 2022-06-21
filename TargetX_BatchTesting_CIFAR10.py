@@ -1,3 +1,5 @@
+# Basic testing for evaluating Target-X on CIFAR-10
+
 # These are the python libraries that will be used
 import torchvision.transforms as transforms
 import numpy as np
