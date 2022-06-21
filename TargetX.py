@@ -104,7 +104,7 @@ def targetx(image, net, eps=0.05, num_classes=10, overshoot=0.02, max_iter=50):
         fs[0, I[k]].backward(retain_graph=True)
         grad_target = x.grad.data.cpu().numpy().copy()
         target_sign_grad = x.grad.sign().cpu().numpy().copy()
-        
+
         zero_gradients(x)
 
         # set new w_k, distance between original and current gradient, and new f_k, distance between original and target label
