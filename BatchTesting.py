@@ -301,7 +301,7 @@ def runBatchTestTargetFGSM(network, eps, csvname):
         if (int(label_pert) == int(correct)):
             print("Classifier is correct")
             FGSMAccuracy = FGSMAccuracy + 1
-        if (int(label_pert) != int(I[0])):
+        if (int(label_pert) == int(inputNum)):
             print("Image perturbed to a target label")
             TargetSuccess = TargetSuccess + 1
         diff = imagetransform(pert_image.cpu()) - tensortransform(im_orig)
@@ -339,3 +339,327 @@ def runBatchTestTargetFGSM(network, eps, csvname):
         csvwriter.writerows(["Avg F_k: " + str(FGSMAvgFk / 5000)])
         csvwriter.writerows(["Avg Difference: " + str(FGSMAvgDiff / 5000)])
         csvwriter.writerows(["Avg Frobenius of Difference: " + str(FGSMAvgFroDiff / 5000)])
+
+def runBatchTestTUAP(network, eps, csvname):
+    network.eval()
+    network.cuda()
+
+    Accuracy = 0
+    TUAPAccuracy = 0
+    TUAPAvgFk = 0
+    TUAPAvgDiff = 0
+    TUAPAvgFroDiff = 0
+    TargetSuccess = 0
+
+    # Set mean and standard deviation for normalizing image
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+
+    fieldnames = ['Image', 'Original Label', 'Classified Label Before Perturbation', 'Perturbed Label',
+                  'Memory Usage', 'Time', 'F_k', 'Avg Difference', 'Frobenius of Difference']
+
+    counter = 0
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(network.parameters(), lr=0.01)
+
+    classifier = art.estimators.classification.PyTorchClassifier(
+        model=network,
+        input_shape=(3, 224, 224),
+        loss=criterion,
+        optimizer=optimizer,
+        nb_classes=1000
+    )
+    # Create csvwriter for each csv file
+
+    with open(csvname, 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+
+        csvwriter.writerow(fieldnames)
+
+    # Open ILSVRC label file
+    ILSVRClabels = open(os.path.join('ILSVRC2012validation.txt'), 'r').read().split('\n')
+
+    for filename in glob.glob('D:/Imagenet/ImagenetDataset/ILSVRC2012/ILSVRC/Data/CLS-LOC/val/*.JPEG'):  # assuming jpg
+        print(" \n\n\n**************** T-UAP *********************\n")
+        im_orig = Image.open(filename).convert('RGB')
+        print(filename)
+        if counter == 5000:
+            break
+        im = transforms.Compose([
+            transforms.Scale(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean,
+                                 std=std)])(im_orig)
+
+        def clip_tensor(A, minv, maxv):
+            A = torch.max(A, minv * torch.ones(A.shape))
+            A = torch.min(A, maxv * torch.ones(A.shape))
+            return A
+
+        clip = lambda x: clip_tensor(x, 0, 255)
+
+        imagetransform = transforms.Compose(
+            [transforms.Normalize(mean=[0, 0, 0], std=list(map(lambda x: 1 / x, std))),
+             transforms.Normalize(list(map(lambda x: -x, mean)), std=[1, 1, 1]),
+             transforms.Lambda(clip)])
+
+        tensortransform = transforms.Compose([transforms.Scale(256),
+                                              transforms.CenterCrop(224),
+                                              transforms.ToTensor(),
+                                              transforms.Normalize(mean=[0, 0, 0],
+                                                                   std=list(map(lambda x: 1 / x, std))),
+                                              transforms.Normalize(list(map(lambda x: -x, mean)), std=[1, 1, 1]),
+                                              transforms.Lambda(clip)])
+
+        # returns the 10 nearest labels for the image
+        # I = targetx_return_I_array(im, network, 10)
+        # print(I)
+        # I = np.asarray(I)
+        I = targetx_return_I_array(im, network, 10)
+        print(I)
+
+        # label to exclude from choice
+        exclude_label = I[0]
+        # chooses a random int in the I array
+        inputNum = random.choice(I)
+        if inputNum == exclude_label:
+            print("target label same as original label")
+            inputNum = random.choice(I)
+        targetLabel = np.array([])
+        targetLabel = np.append(targetLabel, inputNum)
+
+        start_time = time.time()
+        input_batch = im.unsqueeze(0)
+        result = classifier.predict(input_batch, 1, False)
+        label_orig = np.argmax(result.flatten())
+        attack = art.attacks.evasion.TargetedUniversalPerturbation(classifier=classifier, attacker='fgsm', eps=eps)
+        input_array = input_batch.numpy()
+        img_adv = attack.generate(x=input_array, y=targetLabel)
+        print("Memory Usage: ", torch.cuda.memory_stats('cuda:0')['active.all.current'])
+        result_adv = classifier.predict(img_adv, 1, False)
+        label_pert = np.argmax(result_adv.flatten())
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print("execution time = " + str(execution_time))
+
+        perturbed_img = img_adv.squeeze()
+        labels = open(os.path.join('synset_words.txt'), 'r').read().split('\n')
+        correct = ILSVRClabels[np.int(counter)].split(' ')[1]
+
+        str_label_correct = labels[np.int(correct)].split(',')[0]
+        str_label_orig = labels[np.int(label_orig)].split(',')[0]
+        str_label_pert = labels[np.int(label_pert)].split(',')[0]
+
+        print("Correct label = ", str_label_correct)
+        print("Original label = ", str_label_orig)
+        print("Perturbed label = ", str_label_pert)
+        if (int(label_orig) == int(correct)):
+            print("Original classification is correct")
+            Accuracy = Accuracy + 1
+        pert_image = torch.from_numpy(perturbed_img)
+
+        # If perturbed label matches correct label, add to accuracy count
+        if (int(label_pert) == int(correct)):
+            print("Classifier is correct")
+            TUAPAccuracy = TUAPAccuracy + 1
+        if (int(label_pert) == int(inputNum)):
+            print("Image perturbed to target label")
+            TargetSuccess = TargetSuccess + 1
+        diff = imagetransform(pert_image.cpu()) - tensortransform(im_orig)
+        fro = np.linalg.norm(diff.numpy())
+        average = torch.mean(torch.abs(diff))
+        inp = torch.autograd.Variable(torch.from_numpy(input_array[0]).to('cuda:0').float().unsqueeze(0),
+                                      requires_grad=True)
+        fs = network.forward(inp)
+        f_k = (fs[0, label_pert] - fs[0, int(correct)]).data.cpu().numpy()
+        TUAPAvgFk = TUAPAvgFk + f_k
+        TUAPAvgDiff = TUAPAvgDiff + average
+        TUAPAvgFroDiff = TUAPAvgFroDiff + fro
+        print(TUAPAvgFk)
+        rows = []
+        rows.append([filename[47:75], str_label_correct, str_label_orig, str_label_pert,
+                     torch.cuda.memory_stats('cuda:0')['active.all.current'], str(execution_time),
+                     f_k, average, fro])
+        with open(csvname, 'a', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+
+            csvwriter.writerows(rows)
+
+        print(
+            "#################################### END T-UAP Testing ############################################################\n")
+        counter = counter + 1
+
+    # Add total values to csv file
+
+    with open(csvname, 'a', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerows(["Epsilon: " + str(eps)])
+        csvwriter.writerows(["Accuracy: " + str(Accuracy / 5000)])
+        csvwriter.writerows(["Perturbed Accuracy: " + str(TUAPAccuracy / 5000)])
+        csvwriter.writerows(["Perturbed Target Success: " + str(TargetSuccess / 5000)])
+        csvwriter.writerows(["Avg F_k: " + str(TUAPAvgFk / 5000)])
+        csvwriter.writerows(["Avg Difference: " + str(TUAPAvgDiff / 5000)])
+        csvwriter.writerows(["Avg Frobenius of Difference: " + str(TUAPAvgFroDiff / 5000)])        
+        
+def runBatchTestElasticNet(network, eps, csvname):
+    network.eval()
+    network.cuda()
+
+    Accuracy = 0
+    EADAccuracy = 0
+    EADAvgFk = 0
+    EADAvgDiff = 0
+    EADAvgFroDiff = 0
+    TargetSuccess = 0
+
+    # Set mean and standard deviation for normalizing image
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+
+    fieldnames = ['Image', 'Original Label', 'Classified Label Before Perturbation', 'Perturbed Label',
+                  'Memory Usage', 'Time', 'F_k', 'Avg Difference', 'Frobenius of Difference']
+
+    counter = 0
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(network.parameters(), lr=0.01)
+
+    classifier = art.estimators.classification.PyTorchClassifier(
+        model=network,
+        input_shape=(3, 224, 224),
+        loss=criterion,
+        optimizer=optimizer,
+        nb_classes=1000
+    )
+    # Create csvwriter for each csv file
+
+    with open(csvname, 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+
+        csvwriter.writerow(fieldnames)
+
+    # Open ILSVRC label file
+    ILSVRClabels = open(os.path.join('ILSVRC2012validation.txt'), 'r').read().split('\n')
+
+    for filename in glob.glob('D:/Imagenet/ImagenetDataset/ILSVRC2012/ILSVRC/Data/CLS-LOC/val/*.JPEG'):  # assuming jpg
+        print(" \n\n\n**************** ElasticNet *********************\n")
+        im_orig = Image.open(filename).convert('RGB')
+        print(filename)
+        if counter == 5000:
+            break
+        im = transforms.Compose([
+            transforms.Scale(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean,
+                                 std=std)])(im_orig)
+
+        def clip_tensor(A, minv, maxv):
+            A = torch.max(A, minv * torch.ones(A.shape))
+            A = torch.min(A, maxv * torch.ones(A.shape))
+            return A
+
+        clip = lambda x: clip_tensor(x, 0, 255)
+
+        imagetransform = transforms.Compose(
+            [transforms.Normalize(mean=[0, 0, 0], std=list(map(lambda x: 1 / x, std))),
+             transforms.Normalize(list(map(lambda x: -x, mean)), std=[1, 1, 1]),
+             transforms.Lambda(clip)])
+
+        tensortransform = transforms.Compose([transforms.Scale(256),
+                                              transforms.CenterCrop(224),
+                                              transforms.ToTensor(),
+                                              transforms.Normalize(mean=[0, 0, 0],
+                                                                   std=list(map(lambda x: 1 / x, std))),
+                                              transforms.Normalize(list(map(lambda x: -x, mean)), std=[1, 1, 1]),
+                                              transforms.Lambda(clip)])
+
+        # returns the 10 nearest labels for the image
+        # I = targetx_return_I_array(im, network, 10)
+        # print(I)
+        # I = np.asarray(I)
+        I = targetx_return_I_array(im, network, 10)
+        print(I)
+
+        # label to exclude from choice
+        exclude_label = I[0]
+        # chooses a random int in the I array
+        inputNum = random.choice(I)
+        if inputNum == exclude_label:
+            print("target label same as original label")
+            inputNum = random.choice(I)
+        targetLabel = np.array([])
+        targetLabel = np.append(targetLabel, inputNum)
+
+        start_time = time.time()
+        input_batch = im.unsqueeze(0)
+        result = classifier.predict(input_batch, 1, False)
+        label_orig = np.argmax(result.flatten())
+        attack = art.attacks.evasion.ElasticNet(classifier=classifier, targeted=True, decision_rule='L1', beta=eps)
+        input_array = input_batch.numpy()
+        img_adv = attack.generate(x=input_array, y=targetLabel)
+        print("Memory Usage: ", torch.cuda.memory_stats('cuda:0')['active.all.current'])
+        result_adv = classifier.predict(img_adv, 1, False)
+        label_pert = np.argmax(result_adv.flatten())
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print("execution time = " + str(execution_time))
+
+        perturbed_img = img_adv.squeeze()
+        labels = open(os.path.join('synset_words.txt'), 'r').read().split('\n')
+        correct = ILSVRClabels[np.int(counter)].split(' ')[1]
+
+        str_label_correct = labels[np.int(correct)].split(',')[0]
+        str_label_orig = labels[np.int(label_orig)].split(',')[0]
+        str_label_pert = labels[np.int(label_pert)].split(',')[0]
+
+        print("Correct label = ", str_label_correct)
+        print("Original label = ", str_label_orig)
+        print("Perturbed label = ", str_label_pert)
+        if (int(label_orig) == int(correct)):
+            print("Original classification is correct")
+            Accuracy = Accuracy + 1
+        pert_image = torch.from_numpy(perturbed_img)
+
+        # If perturbed label matches correct label, add to accuracy count
+        if (int(label_pert) == int(correct)):
+            print("Classifier is correct")
+            EADAccuracy = EADAccuracy + 1
+        if (int(label_pert) == int(inputNum)):
+            print("Image perturbed to target label")
+            TargetSuccess = TargetSuccess + 1
+        diff = imagetransform(pert_image.cpu()) - tensortransform(im_orig)
+        fro = np.linalg.norm(diff.numpy())
+        average = torch.mean(torch.abs(diff))
+        inp = torch.autograd.Variable(torch.from_numpy(input_array[0]).to('cuda:0').float().unsqueeze(0),
+                                      requires_grad=True)
+        fs = network.forward(inp)
+        f_k = (fs[0, label_pert] - fs[0, int(correct)]).data.cpu().numpy()
+        EADAvgFk = EADAvgFk + f_k
+        EADAvgDiff = EADAvgDiff + average
+        EADAvgFroDiff = EADAvgFroDiff + fro
+        print(EADAvgFk)
+        rows = []
+        rows.append([filename[47:75], str_label_correct, str_label_orig, str_label_pert,
+                     torch.cuda.memory_stats('cuda:0')['active.all.current'], str(execution_time),
+                     f_k, average, fro])
+        with open(csvname, 'a', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+
+            csvwriter.writerows(rows)
+
+        print(
+            "#################################### END ElasticNet Testing ############################################################\n")
+        counter = counter + 1
+
+    # Add total values to csv file
+
+    with open(csvname, 'a', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerows(["Epsilon: " + str(eps)])
+        csvwriter.writerows(["Accuracy: " + str(Accuracy / 5000)])
+        csvwriter.writerows(["Perturbed Accuracy: " + str(EADAccuracy / 5000)])
+        csvwriter.writerows(["Perturbed Target Success: " + str(TargetSuccess / 5000)])
+        csvwriter.writerows(["Avg F_k: " + str(EADAvgFk / 5000)])
+        csvwriter.writerows(["Avg Difference: " + str(EADAvgDiff / 5000)])
+        csvwriter.writerows(["Avg Frobenius of Difference: " + str(EADAvgFroDiff / 5000)])v
