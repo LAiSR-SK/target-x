@@ -16,9 +16,15 @@ net.eval()
 
 #Open image
 # im_orig = Image.open('new/ILSVRC2017_test_00004355.JPEG')
+# im_orig = Image.open('new/ILSVRC2017_test_00004376.JPEG')
 # im_orig = Image.open('pictures/buffalo.JPEG')
 # im_orig = Image.open('pictures/cat.JPEG')
-im_orig = Image.open('pictures/owl.JPEG')
+# im_orig = Image.open('pictures/owl.JPEG')
+# im_orig = Image.open('pictures/orangutan.JPEG')
+# im_orig = Image.open('pictures/llama.JPEG')
+im_orig = Image.open('pictures/crocodile.JPEG')
+# im_orig = Image.open('pictures/dog.JPEG')
+# im_orig = Image.open('pictures/dog2.JPEG')
 
 
 mean = [ 0.485, 0.456, 0.406 ]
@@ -37,7 +43,7 @@ im = transforms.Compose([
 I = targetx_return_I_array(im, net, 10)
 print(I)
 start_time = time.time()
-r, loop_i, label_orig, label_pert, pert_image, pert, newf_k = targetx(im, net, 0.001)
+r, loop_i, label_orig, label_pert, pert_image, pert, newf_k = targetx(im, net, 0.2)
 # r, loop_i, label_orig, label_pert, pert_image, pert, newf_k = targetx_arg(im, net, 318, 0.001)
 end_time = time.time()
 exec_time  = end_time-start_time
@@ -70,21 +76,6 @@ tf = transforms.Compose([transforms.Normalize(mean=[0, 0, 0], std=list(map(lambd
                         transforms.ToPILImage(),
                         transforms.CenterCrop(224)])
 
-# plt.figure()
-# plt.imshow(tf(im.cpu()))
-# plt.title(str_label_orig)
-# plt.show()
-#
-# plt.figure()
-# plt.imshow(tf(pert_image.cpu()[0]))
-# plt.title(str_label_pert)
-# plt.show()
-#
-# plt.figure()
-# plt.imshow(tf(pert.cpu()[0]))
-# plt.title(str_label_pert)
-# plt.show()
-
 plt.figure()
 plt.imshow(tf(im.cpu()))
 plt.title(str_label_orig)
@@ -98,8 +89,16 @@ plt.title(str_label_pert)
 plt.show()
 print(loop_i)
 plt.figure()
-fc = 100000
+fc = 100
 plt.imshow(tf(pert.cpu()[0]*fc))
 tf(pert.cpu()[0]*fc).save('perturbation.png')
 plt.title(str_label_pert)
 plt.show()
+
+#10000000(0) - 0.0005
+#1000000(0) - 0.005
+#10000 - 0.05
+#100 - 0.1
+#100000 - 0.01
+#10000000 - 0.001
+#10000000000 - 0.0001
