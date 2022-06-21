@@ -1,9 +1,10 @@
+import gc
 import torch.nn as nn
 import torchvision.transforms as transforms
 import numpy as np
 import torch
 import torch.optim as optim
-from ImmunityTestingFunction import TargetX_Immunity_Testing, targetFGSM_Immunity_Testing
+from ImmunityTestingFunction import TargetX_Immunity_Testing, targetFGSM_Immunity_Testing, targetUAP_Immunity_Testing
 import torchvision.models as models
 from PIL import Image
 from TargetX import targetx_arg, targetx_return_I_array
@@ -161,6 +162,57 @@ targetfgsm_rnet_101_2 = models.resnet101(pretrained=True)
 targetfgsm_rnet_101_2.cuda()
 targetfgsm_rnet_101_2.eval()
 
+# TARGET-UAP AlexNet
+targetuap_anet_0005 = models.alexnet(pretrained=True)
+targetuap_anet_0005.cuda()
+targetuap_anet_0005.eval()
+
+targetuap_anet_05 = models.alexnet(pretrained=True)
+targetuap_anet_05.cuda()
+targetuap_anet_05.eval()
+
+targetuap_anet_2 = models.alexnet(pretrained=True)
+targetuap_anet_2.cuda()
+targetuap_anet_2.eval()
+
+# TARGET-UAP GoogleNet
+targetuap_gnet_0005 = models.googlenet(pretrained=True)
+targetuap_gnet_0005.cuda()
+targetuap_gnet_0005.eval()
+
+targetuap_gnet_05 = models.googlenet(pretrained=True)
+targetuap_gnet_05.cuda()
+targetuap_gnet_05.eval()
+
+targetuap_gnet_2 = models.googlenet(pretrained=True)
+targetuap_gnet_2.cuda()
+targetuap_gnet_2.eval()
+
+# TARGET-UAP ResNet-34
+targetuap_rnet_34_0005 = models.resnet34(pretrained=True)
+targetuap_rnet_34_0005.cuda()
+targetuap_rnet_34_0005.eval()
+
+targetuap_rnet_34_05 = models.resnet34(pretrained=True)
+targetuap_rnet_34_05.cuda()
+targetuap_rnet_34_05.eval()
+
+targetuap_rnet_34_2 = models.resnet34(pretrained=True)
+targetuap_rnet_34_2.cuda()
+targetuap_rnet_34_2.eval()
+
+# TARGET-UAP ResNet-101
+targetuap_rnet_101_0005 = models.resnet101(pretrained=True)
+targetuap_rnet_101_0005.cuda()
+targetuap_rnet_101_0005.eval()
+
+targetuap_rnet_101_05 = models.resnet101(pretrained=True)
+targetuap_rnet_101_05.cuda()
+targetuap_rnet_101_05.eval()
+
+targetuap_rnet_101_2 = models.resnet101(pretrained=True)
+targetuap_rnet_101_2.cuda()
+targetuap_rnet_101_2.eval()
 
 def TargetX_Immunity_Training(orig_net, immune_net, name, eps):
     if is_cuda:
@@ -320,3 +372,107 @@ def TargetFGSM_Immunity_Training(orig_net, immune_net, name, eps):
     PATH = 'targetFGSM_adv_net' + str(eps) + name + '.csv'
     torch.save(immune_net.state_dict(), PATH)
     return immune_net
+
+def TargetUAP_Immunity_Training(orig_net, immune_net, name, eps):
+    if is_cuda:
+        immune_net.cuda()
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(immune_net.parameters(), lr=1e-5)
+
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(orig_net.parameters(), lr=0.01)
+
+    classifier = art.estimators.classification.PyTorchClassifier(
+        model=orig_net,
+        input_shape=(3, 224, 224),
+        loss=criterion,
+        optimizer=optimizer,
+        nb_classes=1000
+    )
+
+    for epoch in range(5):
+        if epoch != 0 :
+            PATH = './targetUAP_adv_net' + name + str(epoch) + '.pth'
+            torch.save(immune_net.state_dict(), PATH)
+            immune_net.eval()
+            csv = 'targetUAP' + name + 'immunityepoch' + str(epoch) + str(eps) + '.csv'
+            targetUAP_Immunity_Testing(net, immune_net, eps, csv)
+            immune_net.train()
+        running_loss = 0.0
+        i = 0
+        counter = 0
+        for filename in glob.glob('D:/Imagenet/ILSVRC2012/ILSVRC/Data/CLS-LOC/val/*.JPEG'):
+            if counter == 5000:
+                break
+            im_orig = Image.open(filename).convert('RGB')
+            im = transforms.Compose([
+                transforms.Scale(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=mean, std=std)])(im_orig)
+
+            I = targetx_return_I_array(im, orig_net, 10)
+            print(I)
+
+            # label to exclude from choice
+            exclude_label = I[0]
+            # chooses a random int in the I array
+            inputNum = random.choice(I)
+            if inputNum == exclude_label:
+                print("target label same as original label")
+                inputNum = random.choice(I)
+            targetLabel = np.array([])
+            targetLabel = np.append(targetLabel, inputNum)
+
+            input_batch = im.unsqueeze(0)
+            result = classifier.predict(input_batch, 1, False)
+            label_orig = np.argmax(result.flatten())
+
+            labels = open(os.path.join('synset_words.txt'), 'r').read().split('\n')
+
+            attack = art.attacks.evasion.TargetedUniversalPerturbation(classifier=classifier, attacker='fgsm', eps=eps)
+            input_array = input_batch.numpy()
+            img_adv = attack.generate(x=input_array, y=targetLabel)
+
+            result_adv = classifier.predict(img_adv, 1, False)
+            label_pert = np.argmax(result_adv.flatten())
+
+            inputs = result_adv
+            labels = ILSVRClabels[np.int(counter)].split(' ')[1]
+            labels = torch.tensor([int(labels)])
+            labels = labels.to('cuda')
+            # zero the param gradients
+            optimizer.zero_grad()
+            # forward and backward propagation and then optimization
+            outputs = immune_net(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            # printing the statistics
+            running_loss += loss.item()
+            # prints every 2000 mini-batches
+            if i % 2000 == 1999:
+                print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, running_loss / 2000))
+                running_loss = 0.0
+            i = i + 1
+            counter = counter + 1
+            gc.collect()
+            torch.cuda.empty_cache()
+    print("Finished Training")
+    PATH = 'targetUAP_adv_net' + str(eps) + name + '.csv'
+    torch.save(immune_net.state_dict(), PATH)
+    return immune_net
+
+# Call functions for training and testing
+
+# AlexNet
+targetuap_anet_0005_test = TargetUAP_Immunity_Training(anet, targetuap_anet_0005, 'alexnet', 0.0005)
+targetuap_anet_0005_test.eval()
+
+gc.collect()
+torch.cuda.empty_cache()
+
+targetUAP_Immunity_Testing(anet, targetuap_anet_0005_test, 0.0005, 'TargetUAP_alexnet_Immunity_Finished_0.0005.csv')
