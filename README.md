@@ -1,3 +1,36 @@
 # Target-X
-![](assets/itargetx_snake.png)
-Deep neural networks (DNNs) have achieved a series of significant successes in a wide spectrum of critical domains. For instance, in the field of computer vision, DNNs become the first choice in developing image recognition and classification solutions. However, DNNs have been recently found vulnerable to manipulations of input samples, called adversarial images. The adversarial images can be classified into two categories: untargeted adversarial images which aim to manipulate the output of the DNNs to any incorrect label and targeted adversarial images which force the prediction of the DNNs to a specified target label predefined by the adversary. That being said, the construction of targeted adversarial images requires careful crafting of the targeted perturbations. Different research works have been done to generate targeted adversarial images. However, the majority of them have two limitations: (1) adding large size of perturbations to generate successfully targeted images, and (2) they require extensive computational resources to be utilized in large-scale datasets. This paper introduces Target-X, a novel and fast method for the construction of adversarial targeted images on large-scale datasets that can fool the state-of-the-art image classification neural networks. We evaluate the performance of Target-X using the well-trained image classification neural networks of different architectures and compare it with the well-known T-FGSM and T-UAP targeted attacks. The reported results demonstrate that Target-X can generate targeted adversarial images with the least perturbations on large-scale datasets that can fool the image classification neural networks and significantly outperform the T-FGSM and T-UAP attacks.
+
+<img src="assets/targetx_snake.png" alt="Sample adversarial examples generated with Target-X, T-FGSM, adn T-UAP" width="200"/>
+
+This repository introduces Target-X, a novel and fast method for the construction of adversarial targeted images on large-scale datasets that can fool the state-of-the-art image classification neural networks. We evaluate the performance of Target-X using the well-trained image classification neural networks of different architectures and compare it with the well-known T-FGSM and T-UAP targeted attacks. The reported results demonstrate that Target-X can generate targeted adversarial images with the least perturbations on large-scale datasets that can fool the image classification neural networks and significantly outperform the T-FGSM and T-UAP attacks.
+
+## Setup and Installation
+### Cloning from git
+To clone the repository us the following:
+```
+git clone https://github.com/nssrlab/target-x.git <DESTINATION>
+```
+Where <DESTINATION> is the folder you want Target-X to reside in.
+
+### Setting up a Conda environment
+:: TODO
+
+## Running Target-X
+:: TODO
+
+## Manifest
+:: TODO
+
+## Cite Us
+```
+@INPROCEEDINGS{10197071,
+  author={Khamaiseh, Samer Y. and Bagagem, Derek and Al-Alaj, Abdullah and Mancino, Mathew and Alomari, Hakem and Aleroud, Ahmed},
+  booktitle={2023 IEEE 47th Annual Computers, Software, and Applications Conference (COMPSAC)}, 
+  title={Target-X: An Efficient Algorithm for Generating Targeted Adversarial Images to Fool Neural Networks}, 
+  year={2023},
+  volume={},
+  number={},
+  pages={617-626},
+  keywords={Training;Image recognition;Perturbation methods;Force;Artificial neural networks;Computer architecture;Robustness;adversarial images;deep learning;image classification neural networks;adversarial deep neural networks},
+  doi={10.1109/COMPSAC57700.2023.00087}}
+```
