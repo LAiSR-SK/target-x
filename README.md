@@ -110,10 +110,12 @@ git clone https://github.com/nssrlab/target-x.git <DESTINATION>
 Where <DESTINATION> is the folder you want Target-X to reside in.
 
 ### Setting up a Conda environment
-:: TODO
+To create a conda environment to run the project in, use the provided `environment.yml` in the following command:
+```
+conda env create -f environment.yml -n <ENVIRONMENT_NAME>
+```
 
-## Running Target-X
-:: TODO
+Where `<ENVIRONMENT_NAME>` is the name you want to use for the conda environment.
 
 ## Cite Us
 ```
