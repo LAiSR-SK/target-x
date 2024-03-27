@@ -107,7 +107,7 @@ To clone the repository us the following:
 ```
 git clone https://github.com/nssrlab/target-x.git <DESTINATION>
 ```
-Where <DESTINATION> is the folder you want Target-X to reside in.
+Where `<DESTINATION>` is the folder you want Target-X to reside in.
 
 ### Setting up a Conda environment
 To create a conda environment to run the project in, use the provided `environment.yml` in the following command:
