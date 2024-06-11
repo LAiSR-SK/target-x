@@ -1,6 +1,6 @@
 # Batch testing file for evaluation of Target-X, Target-FGSM, and Target-UAP, 
 # outputs results as csv files. Evaluates each algorithm on 5000 images from the ILSVRC validation dataset.
-
+# To do
 # These are the python libraries that will be used
 import torchvision.transforms as transforms
 import numpy as np
